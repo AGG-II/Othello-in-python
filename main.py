@@ -1,5 +1,5 @@
-
 # crear_tablero : None -> [[char]]
+# Crea un tablero de 8x8 y coloca las 4 fichas iniciales de la partida con sus correspondientes colores;
 def crear_tablero():
     lista = [[" " for i in range(8)] for i in range(8)]
     lista[3][3] = "B"
@@ -9,6 +9,7 @@ def crear_tablero():
     return lista
 
 # crear_contorno : None -> Set((Int,Int))
+# Crea un set donde guarda el contorno de las casillas vacías que son adyacentes a una casilla con una ficha de color
 def crear_contorno():
     contorno = set()
     #lista = [C3, D3, E3, F3, C4, F4, C5, F5, C6, D6, E6, F6]
@@ -95,7 +96,7 @@ def agregar_a_contorno(coordenadas, contorno, tablero):
     vectores = ((-1,-1),(0,-1),(1,-1),(-1,0),(1,0),(-1,1),(0,1),(1,1))
 
     for (a,b) in vectores:
-        if x+a in range(8) and y+b in range(8) and tablero[x+a][y+b] == " ":
+        if x+a in range(8) and y+b in range(8) and tablero[y+b][x+a] == " ":
             contorno.add((x+a , y+b))
 
 #hay_ganador: [[Char]] -> Char
@@ -133,6 +134,7 @@ def imprimir(tablero):
         print(f"\t| {columnas[i]}", end = "") 
         i +=1
     print()
+    print("\t------------------------------------------------------------")
     for fila in range(1,9):
         print(f"{fila} ", end = "" )
         for casillero in tablero[fila-1]:
@@ -160,20 +162,24 @@ def intentar_saltear(tablero, jugador_actual, contorno):
 
 #que_tipo_de_error String String -> String
 #Retorna un mensaje persoalizado de error, dependiendo de la jugada final que se intentó hacer.
-def que_tipo_de_error(jugada_final, nombre_j_final):
+def que_tipo_de_error(jugada_final, nombre_j_final, ultima_ficha):
     error_handler = {
         
         "": "No se ingresó ninguna jugada",
         
-        " " : "No se podía saltear el turno"
+        " " : "No se podía saltear el turno",
         
+        "s" : (f"{nombre_j_final} trató de poner una ficha que no existe, la ficha {ultima_ficha} no existe")
     }
     error_de_posicion = f"El jugador {nombre_j_final}, trato de colocar una ficha en {jugada_final} y esa es una posicion invalida"
     return(error_handler.get(jugada_final, error_de_posicion))
 
 #jugar : None -> None
+# Función en la que se llaman al resto de funciones y se lee el archivo.
 def jugar():
-    partida = open("partida.txt", "r")
+    ingreso = input("Ingrese el nombre del archivo que desea verificar:")
+    partida = open(f"{ingreso}.txt", "r")
+
     
     (jugador1, color_j1) = partida.readline().strip('\n').split(",")
     (jugador2, color_j2) = partida.readline().strip('\n').split(",")
@@ -184,11 +190,11 @@ def jugar():
     tablero = crear_tablero()
     contorno = crear_contorno()
     hubo_error = False
-    hubo_ganador = False
     jugada = partida.readline()
     jugada_final = jugada
+    ficha_con_mala_sintaxis = ""
 
-    while  not(hubo_error) and not(hubo_ganador) and jugada != "":
+    while  not(hubo_error) and jugada != "":
         jugada = jugada.strip("\n")
         if jugada == "":
             hubo_error = (not intentar_saltear(tablero,jugador_actual,contorno))
@@ -198,27 +204,42 @@ def jugar():
             hubo_error = not(jugada_valida(coordenadas, tablero, jugador_actual, True))
             jugada_final = jugada
             if not(hubo_error):
-                contorno.remove(coordenadas) # si la ficha era una jugada valida, entonces pertenece al contorno
+                contorno.remove(coordenadas) # si la ficha era una jugada valida, entonces pertenecía al contorno
                 agregar_a_contorno(coordenadas, contorno, tablero)
         else:
             hubo_error = True
-            jugada_final = jugada
+            jugada_final = "s" # "s" para representar una sintaxis incorrecta
+            ficha_con_mala_sintaxis = jugada
+            
         jugador_actual = cambiar_jugador[jugador_actual]
         jugada = partida.readline()
+    
     imprimir(tablero)
     if hubo_error:
         jugador_actual = cambiar_jugador[jugador_actual]
-        output = que_tipo_de_error(jugada_final, nombres[jugador_actual])
+        output = que_tipo_de_error(jugada_final, nombres[jugador_actual],ficha_con_mala_sintaxis)
         print(output)
-        print("Ultimas coordenadas tomadas:", coordenadas)
-    print("Le tocaba a", jugador_actual)
+    else:
+        posibilidad_ganador=hay_ganador(tablero,contorno)
+        if(posibilidad_ganador!=""):
+            print("El ganador es", nombres[posibilidad_ganador])
+        else:
+            print("Ahora le toca a:", nombres[jugador_actual])
+    
     partida.close()
 
-#generador_tableros_prueba: (Chart) -> [[Chart]]
-#Genera tableros de prueba a usarse en los pytest con una tupla de casillas que van a estar
-def generador_tableros_prueba(casillas):
-    tablero=crear_tablero
-    
+#generador_tableros_prueba: ((Int)) Char -> [[Chart]]
+#Genera tableros de prueba a usarse en los pytest con una tupla de casillas que van a estar y el color que inicia
+#la partida
+def generador_tableros_prueba(casillas, color):
+    tablero=crear_tablero()
+    cambiar_jugador = {'B':'N','N':'B'}
+    for (x,y) in casillas:
+        tablero[x][y]=color
+        color=cambiar_jugador[color]
+    return tablero
+
+           
 
 #Test de la función sintaxis_correcta()
 def test_sintaxis_correcta():
@@ -229,6 +250,61 @@ def test_sintaxis_correcta():
 
 #Test de la función buscar_ficha()
 def test_buscar_ficha():
-    
-    pass
-    
+    prueba1=((2,3),(2,2),(2,1),(5,3),(5,4),(5,5),(6,6),(5,6),(6,3),(1,1),(0,0),(7,2),(5,7),(5,2),(5,1),(4,1),(3,1),(2,5),(4,5),(6,5),(1,7))
+    tablero=generador_tableros_prueba(prueba1,"N")
+    buscar_ficha((6,5),(-1,1),tablero,"N") == True
+    buscar_ficha((5,5),(0,-1),tablero,"B") == True
+    buscar_ficha((1,1),(-1,-1),tablero,"N") == False
+
+#Test de jugada_valida()
+def test_jugada_valida():
+    prueba1=((2,3),(2,2),(2,1),(5,3),(5,4),(5,5),(6,6),(5,6),(6,3),(1,1),(0,0),(7,2),(5,7),(5,2),(5,1),(4,1),(3,1),(2,5),(4,5),(6,5),(1,7))
+    tablero=generador_tableros_prueba(prueba1,"N")
+    jugada_valida((5,0),tablero,"B",False) == True
+    jugada_valida((7,7),tablero,"B",True) == False
+    jugada_valida((4,6),tablero,"B",True) == True
+
+ #Test de hay_ganador()
+def test_hay_ganador():
+    prueba2=((3,4),(3,3),(3,2),(2,2),(4,3),(3,5))
+    tablero1 = [["N" for i in range(8)] for i in range(8)]
+    tablero3 = [["B" for i in range(8)] for i in range(8)]
+    tablero3[1][1] = "N"
+    tablero2 = crear_tablero()
+    contorno2 = crear_contorno()
+    hay_ganador(tablero1,set()) == "N"
+    hay_ganador(tablero2, contorno2) == ""
+    hay_ganador(tablero3,set()) == "B"
+
+#Test de intentar_saltear()
+def test_intentar_saltear():
+    tablero1 = [["N" for i in range(8)] for i in range(8)]
+    tablero2 = [["" for i in range(8)] for i in range(8)]
+    for i in range(8):
+        tablero2[4][i]="N"
+    tablero2[4][5]="B"
+    contorno2 = set()
+    for i in range(8):
+        contorno2.add((3,i))
+        contorno2.add((5,i))
+    tablero3 = crear_tablero()
+    contorno3 = crear_contorno()
+    intentar_saltear(tablero3,"N",contorno3) == False
+    intentar_saltear(tablero1,"N",set()) == False
+    intentar_saltear(tablero2,"B",contorno2) == True
+
+#Test de generador_tableros_prueba()
+def test_generador_tableros_prueba():
+    tablero1=crear_tablero()
+    tablero1[0][1]="B"
+    tablero1[0][2]="N"
+    tablero2 = crear_tablero()
+    for i in range(3,8):
+        tablero2[i][4]="B"
+    tablero2[0][0]="N"
+    generador_tableros_prueba((),"N") == crear_tablero()
+    generador_tableros_prueba(((0,1),(0,2)),"B") == tablero1
+    generador_tableros_prueba(((3,4),(0,0),(4,4),(0,0),(5,4),(0,0),(6,4),(0,0),(7,4)),"B") == tablero2
+
+if __name__ == "__main__":
+    jugar()
